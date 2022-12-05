@@ -95,6 +95,24 @@ impl Connection {
             }
         }
     }
+
+    pub async fn connect_with_name(
+        &self,
+        device_name: String,
+    ) -> Result<Ledger, LedgerUtilityError> {
+        let mut devices = self.get_all_ledgers().await?;
+        let mut names = Vec::new();
+        for device in &devices {
+            names.push(device.name().await?);
+        }
+        let index = names
+            .iter()
+            .position(|x| x == &device_name)
+            .ok_or(LedgerUtilityError::DeviceNotFound)?;
+        let device = devices.swap_remove(index);
+
+        self.connect(device).await
+    }
 }
 #[cfg(test)]
 mod test {

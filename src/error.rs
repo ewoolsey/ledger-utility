@@ -23,4 +23,7 @@ pub enum LedgerUtilityError {
     /// Error from the bluetooth transport
     #[error("{0}")]
     Ble(#[from] LedgerBleError),
+
+    #[error("No device found")]
+    DeviceNotFound,
 }
