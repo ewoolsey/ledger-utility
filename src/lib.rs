@@ -99,15 +99,26 @@ impl Connection {
 #[cfg(test)]
 mod test {
     use log::info;
+    use serial_test::serial;
 
     use super::*;
-
     #[tokio::test]
+    #[serial]
     async fn test_get_all_ledgers() {
         let connection = Connection::new().await;
         let ledgers = connection.get_all_ledgers().await.unwrap();
         for ledger in ledgers {
             info!("{}", ledger.name().await.unwrap())
+        }
+    }
+
+    #[tokio::test]
+    #[serial]
+    async fn test_connect() {
+        let connection = Connection::new().await;
+        let mut ledgers = connection.get_all_ledgers().await.unwrap();
+        if let Some(ledger) = ledgers.pop() {
+            connection.connect(ledger).await.unwrap();
         }
     }
 }

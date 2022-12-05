@@ -1,6 +1,6 @@
 [package]
 name = "ledger-utility"
-description = "An interface to allow easily interacting with ledgers"
+description = "An interface to allow easily interacting with ledgers via bluetooth and usb."
 version = "0.1.0"
 license = "Apache-2.0"
 authors = ["Eric Woolsey <ewoolsey@ualberta.ca>"]
@@ -20,5 +20,6 @@ ledger-transport = "0.10"
 btleplug = "0.10"
 
 [dev-dependencies]
+serial_test = "0.7.0"
 env_logger = "0.9"
 tokio = { version = "1", features = ["macros"] }
