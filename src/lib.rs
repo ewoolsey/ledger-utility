@@ -44,6 +44,9 @@ impl Device {
     pub async fn name(&self) -> Result<String, LedgerUtilityError> {
         match self {
             Device::Bluetooth(peripheral) => {
+                if !peripheral.is_connected().await.unwrap() {
+                    peripheral.connect().await.unwrap();
+                }
                 let properties = peripheral.properties().await.unwrap().unwrap();
                 let local_name = properties
                     .local_name
@@ -107,19 +110,24 @@ impl Connection {
     pub async fn connect_with_name(
         &self,
         device_name: String,
+        num_retries: u8,
     ) -> Result<Ledger, LedgerUtilityError> {
-        let mut devices = self.get_all_ledgers().await?;
-        let mut names = Vec::new();
-        for device in &devices {
-            names.push(device.name().await?);
-        }
-        let index = names
-            .iter()
-            .position(|x| x == &device_name)
-            .ok_or(LedgerUtilityError::DeviceNotFound)?;
-        let device = devices.swap_remove(index);
+        for _ in 0..num_retries {
+            let mut devices = self.get_all_ledgers().await?;
+            let mut names = Vec::new();
+            for device in &devices {
+                names.push(device.name().await?);
+            }
+            let index = match names.iter().position(|x| x == &device_name) {
+                Some(i) => i,
+                None => continue,
+            };
 
-        self.connect(device).await
+            let device = devices.swap_remove(index);
+
+            return self.connect(device).await;
+        }
+        Err(LedgerUtilityError::DeviceNotFound)
     }
 }
 #[cfg(test)]
