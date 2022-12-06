@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{fmt::Debug, ops::Deref};
 
 use btleplug::{api::Peripheral, platform};
 use error::LedgerUtilityError;
@@ -61,6 +61,14 @@ impl Device {
 pub struct Connection {
     bluetooth: platform::Manager,
     hid: HidApi,
+}
+
+impl Debug for Connection {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Connection")
+            .field("bluetooth", &self.bluetooth)
+            .finish()
+    }
 }
 
 impl Connection {
