@@ -1,9 +1,13 @@
 use std::{fmt::Debug, ops::Deref};
 
+#[cfg(feature = "bluetooth")]
 use btleplug::{api::Peripheral, platform};
 use error::LedgerUtilityError;
+#[cfg(feature = "bluetooth")]
 use ledger_bluetooth::TransportNativeBle;
+
 use ledger_transport::{async_trait, APDUAnswer, APDUCommand, Exchange};
+#[cfg(feature = "usb")]
 use ledger_transport_hid::{
     hidapi::{DeviceInfo, HidApi},
     TransportNativeHID,
@@ -11,8 +15,14 @@ use ledger_transport_hid::{
 
 pub mod error;
 
+#[cfg(not(feature = "bluetooth"))]
+#[cfg(not(feature = "usb"))]
+compile_error!("You must enable at least one transport feature: bluetooth or usb");
+
 pub enum Ledger {
+    #[cfg(feature = "bluetooth")]
     Bluetooth(TransportNativeBle),
+    #[cfg(feature = "usb")]
     Usb(TransportNativeHID),
 }
 
@@ -29,20 +39,25 @@ impl Exchange for Ledger {
         I: Deref<Target = [u8]> + Send + Sync,
     {
         match self {
+            #[cfg(feature = "bluetooth")]
             Ledger::Bluetooth(transport) => Ok(transport.exchange(command).await?),
+            #[cfg(feature = "usb")]
             Ledger::Usb(transport) => Ok(transport.exchange(command)?),
         }
     }
 }
 
 pub enum Device {
+    #[cfg(feature = "bluetooth")]
     Bluetooth(platform::Peripheral),
+    #[cfg(feature = "usb")]
     Usb(DeviceInfo),
 }
 
 impl Device {
     pub async fn name(&self) -> Result<String, LedgerUtilityError> {
         match self {
+            #[cfg(feature = "bluetooth")]
             Device::Bluetooth(peripheral) => {
                 if !peripheral.is_connected().await.unwrap() {
                     peripheral.connect().await.unwrap();
@@ -53,6 +68,7 @@ impl Device {
                     .unwrap_or(String::from("(peripheral name unknown)"));
                 Ok(format!("Bluetooth: {}", local_name))
             }
+            #[cfg(feature = "usb")]
             Device::Usb(device_info) => Ok(format!(
                 "Usb: {}",
                 device_info.product_string().unwrap_or_default()
@@ -62,29 +78,36 @@ impl Device {
 }
 
 pub struct Connection {
+    #[cfg(feature = "bluetooth")]
     bluetooth: platform::Manager,
+    #[cfg(feature = "usb")]
     hid: HidApi,
 }
 
 impl Debug for Connection {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Connection")
-            .field("bluetooth", &self.bluetooth)
-            .finish()
+        let mut debug = f.debug_struct("Connection");
+        #[cfg(feature = "bluetooth")]
+        debug.field("bluetooth", &self.bluetooth);
+        debug.finish()
     }
 }
 
 impl Connection {
     pub async fn new() -> Self {
         Self {
+            #[cfg(feature = "bluetooth")]
             bluetooth: platform::Manager::new().await.unwrap(),
+            #[cfg(feature = "usb")]
             hid: HidApi::new().unwrap(),
         }
     }
 
     pub async fn get_all_ledgers(&self) -> Result<Vec<Device>, LedgerUtilityError> {
         let mut ledgers = vec![];
+        #[cfg(feature = "usb")]
         ledgers.extend(TransportNativeHID::list_ledgers(&self.hid).map(|x| Device::Usb(x.clone())));
+        #[cfg(feature = "bluetooth")]
         ledgers.extend(
             TransportNativeBle::list_ledgers(&self.bluetooth)
                 .await?
@@ -96,10 +119,12 @@ impl Connection {
 
     pub async fn connect(&self, device: Device) -> Result<Ledger, LedgerUtilityError> {
         match device {
+            #[cfg(feature = "bluetooth")]
             Device::Bluetooth(peripheral) => {
                 let transport = TransportNativeBle::connect(peripheral).await?;
                 Ok(Ledger::Bluetooth(transport))
             }
+            #[cfg(feature = "usb")]
             Device::Usb(device_info) => {
                 let transport = TransportNativeHID::open_device(&self.hid, &device_info)?;
                 Ok(Ledger::Usb(transport))
